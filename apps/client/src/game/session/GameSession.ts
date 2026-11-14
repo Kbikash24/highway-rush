@@ -1,82 +1,49 @@
 import {
   ATTACKS,
   BIKES,
-  FIXED_DT,
-  RaceSimulation,
-  TRACKS,
-  TRAFFIC_DENSITY,
   WEAPONS,
   findTarget,
-  type BikeId,
-  type MapId,
   type RaceEvent,
-  type RacerConfig,
+  type RaceSimulation,
   type RacerState,
 } from '@highway-rush/shared';
 import { audio } from '../audio/AudioEngine';
 import { input } from '../input/InputManager';
 import { useHud, type HudSnapshot } from '../../store/hudStore';
 import type { RaceResults } from '../../store/gameStore';
-import type { TrafficDensity } from '@highway-rush/shared';
 
-export const PLAYER_ID = 'player';
-
-const RIVALS: Array<Omit<RacerConfig, 'isHuman'>> = [
-  { id: 'rival-1', name: 'Nova', bikeId: 'blade', color: '#f97316', skill: 0.93, aggression: 0.55 },
-  { id: 'rival-2', name: 'Diesel', bikeId: 'thunder', color: '#8b5cf6', skill: 0.99, aggression: 0.85 },
-  { id: 'rival-3', name: 'Kestrel', bikeId: 'viper', color: '#14b8a6', skill: 0.96, aggression: 0.4 },
-];
-
-export interface SessionOptions {
-  mapId: MapId;
-  bikeId: BikeId;
-  playerName: string;
-  trafficDensity: TrafficDensity;
-}
-
-type EventListener = (e: RaceEvent) => void;
-
-const MAX_STEPS_PER_FRAME = 8;
+export type EventListener = (e: RaceEvent) => void;
 
 /**
- * Client-side owner of a local race. Runs the shared deterministic simulation at a fixed tick and
- * exposes interpolation alpha for rendering. In online modes the server will own the simulation.
+ * Everything the renderers, HUD and audio need from a race, independent of where the simulation
+ * runs. `LocalSession` simulates in the browser (solo); `OnlineSession` mirrors a server-owned race.
+ *
+ * Renderers read `sim` (racers, traffic, pickups, track) and interpolate between `prevS/prevD` and
+ * `s/d` using `alpha`.
  */
-export class GameSession {
-  readonly sim: RaceSimulation;
-  readonly playerId = PLAYER_ID;
+export abstract class GameSession {
+  abstract readonly sim: RaceSimulation;
+  abstract readonly playerId: string;
   alpha = 0;
   paused = false;
   shake = 0;
-  /** False until the scene has rendered; the countdown must not run during scene build / shader compile. */
+  /** False until the scene has rendered; the race must not start during scene build / shader compile. */
   ready = false;
+  /** Solo races freeze while paused; online races keep running (the server doesn't wait). */
+  protected readonly pausable: boolean = true;
+  /** Online sessions need to catch up ticks after a stall instead of dropping them (the server keeps going). */
+  protected readonly maxFrameDt: number = 0.1;
   private warmupFrames = 0;
   private warmupTime = 0;
-  private accumulator = 0;
   private hudTimer = 0;
   private listeners = new Set<EventListener>();
-  private scrapeLevel = 0;
+  protected scrapeLevel = 0;
   private finishedHandled = false;
   onFinished: ((results: RaceResults) => void) | null = null;
   onReady: (() => void) | null = null;
 
-  constructor(opts: SessionOptions) {
-    const track = TRACKS[opts.mapId];
-    if (!track) throw new Error(`Map ${opts.mapId} is not playable yet`);
-    this.sim = new RaceSimulation({
-      track,
-      racers: [
-        { id: PLAYER_ID, name: opts.playerName, bikeId: opts.bikeId, isHuman: true, color: BIKES[opts.bikeId].colors.primary },
-        ...RIVALS.map((r) => ({ ...r, isHuman: false })),
-      ],
-      trafficCount: TRAFFIC_DENSITY[opts.trafficDensity],
-      seed: (Math.random() * 2 ** 31) | 0,
-      countdownSeconds: 3.5,
-    });
-  }
-
   get player(): RacerState {
-    return this.sim.racers[0];
+    return this.sim.getRacer(this.playerId)!;
   }
 
   subscribe(cb: EventListener) {
@@ -86,7 +53,17 @@ export class GameSession {
     };
   }
 
-  /** Advance by real frame time; runs the fixed-step simulation. */
+  /** Advance the race by `dt` (real seconds) and set `alpha`. Not called while a solo race is paused. */
+  protected abstract advance(dt: number): void;
+  /** Final results once the race is over, else null. */
+  protected abstract pollResults(): RaceResults | null;
+  /** Called once when the scene is ready to render. */
+  protected onSceneReady() {}
+  /** Called when the session is discarded. */
+  dispose() {
+    this.listeners.clear();
+  }
+
   update(frameDt: number) {
     if (!this.ready) {
       // Wait for a few smooth frames so the first expensive frames don't eat the countdown
@@ -95,31 +72,22 @@ export class GameSession {
       this.warmupTime += Math.min(frameDt, 0.5);
       if (this.warmupFrames >= 10 || this.warmupTime > 4) {
         this.ready = true;
+        this.onSceneReady();
         this.onReady?.();
       }
       useHud.getState().setSnapshot(this.snapshot());
       return;
     }
-    const dt = Math.min(frameDt, 0.1);
+    const dt = Math.min(frameDt, this.maxFrameDt);
     this.shake = Math.max(0, this.shake - dt * 2.5);
     this.scrapeLevel = Math.max(0, this.scrapeLevel - dt * 4);
-    audio.setScrape(this.paused ? 0 : this.scrapeLevel);
-    if (this.paused) {
+    audio.setScrape(this.paused && this.pausable ? 0 : this.scrapeLevel);
+    if (this.paused && this.pausable) {
       audio.updateEngine(0, 0, 0, false, true);
       return;
     }
 
-    this.accumulator += dt;
-    let steps = 0;
-    while (this.accumulator >= FIXED_DT && steps < MAX_STEPS_PER_FRAME) {
-      this.sim.setInput(this.playerId, input.sample(FIXED_DT));
-      this.sim.step(FIXED_DT);
-      for (const e of this.sim.drainEvents()) this.handleEvent(e);
-      this.accumulator -= FIXED_DT;
-      steps++;
-    }
-    if (steps === MAX_STEPS_PER_FRAME) this.accumulator = 0;
-    this.alpha = this.accumulator / FIXED_DT;
+    this.advance(dt);
 
     const p = this.player;
     const { rpm } = this.gearbox(p);
@@ -132,11 +100,14 @@ export class GameSession {
       useHud.getState().prune(performance.now());
     }
 
-    if (this.sim.phase === 'finished' && !this.finishedHandled) {
-      this.finishedHandled = true;
-      const results = this.buildResults();
-      audio.victory(results.player.place === 1);
-      window.setTimeout(() => this.onFinished?.(results), 1800);
+    if (!this.finishedHandled) {
+      const results = this.pollResults();
+      if (results) {
+        this.finishedHandled = true;
+        const me = results.rows.find((r) => r.id === this.playerId);
+        audio.victory(me?.place === 1);
+        window.setTimeout(() => this.onFinished?.(results), 1800);
+      }
     }
   }
 
@@ -151,7 +122,7 @@ export class GameSession {
     return { gear: r.v < 0.5 ? 0 : gear, rpm };
   }
 
-  private handleEvent(e: RaceEvent) {
+  protected handleEvent(e: RaceEvent) {
     const hud = useHud.getState();
     const mine = 'racerId' in e && e.racerId === this.playerId;
     switch (e.type) {
@@ -269,7 +240,7 @@ export class GameSession {
     return kind.toUpperCase();
   }
 
-  /** 1 near the player, fading to 0 at 60 m so distant AI fights stay quiet. */
+  /** 1 near the player, fading to 0 at 60 m so distant fights stay quiet. */
   private proximityGain(racerId: string) {
     if (racerId === this.playerId) return 1;
     const r = this.sim.getRacer(racerId);
@@ -341,36 +312,6 @@ export class GameSession {
         finished: r.finished,
         weapon: r.combat.weapon,
       })),
-    };
-  }
-
-  private buildResults(): RaceResults {
-    const sim = this.sim;
-    const p = this.player;
-    const rows = sim.standings().map((r, i) => {
-      const projected = !r.finished;
-      const avg = Math.max(20, r.s / Math.max(1, sim.time));
-      const time = r.finished ? r.finishTime! : sim.time + Math.max(0, sim.track.raceLength - r.s) / avg;
-      return { id: r.id, name: r.name, color: r.color, isHuman: r.isHuman, place: i + 1, time, projected, topSpeedKmh: r.topSpeed * 3.6, wrecks: r.wrecks, knockouts: r.combat.knockouts };
-    });
-    const placeBonus = [500, 300, 180, 100][p.place - 1] ?? 50;
-    const coins = Math.round(placeBonus + p.score * 0.1 + p.nearMisses * 5 + p.combat.knockouts * 75);
-    const xp = Math.round(120 + (4 - p.place) * 60 + p.score * 0.05);
-    return {
-      rows,
-      player: {
-        place: p.place,
-        time: p.finishTime ?? sim.time,
-        score: p.score,
-        nearMisses: p.nearMisses,
-        wrecks: p.wrecks,
-        collisions: p.collisions,
-        topSpeedKmh: p.topSpeed * 3.6,
-        hitsLanded: p.combat.hitsLanded,
-        knockouts: p.combat.knockouts,
-        coins,
-        xp,
-      },
     };
   }
 }

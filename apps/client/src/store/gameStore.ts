@@ -1,40 +1,21 @@
 import { create } from 'zustand';
-import type { BikeId, MapId } from '@highway-rush/shared';
+import type { BikeId, MapId, RaceResultRow } from '@highway-rush/shared';
 
-export type Screen = 'menu' | 'bikeSelect' | 'race';
+export type Screen = 'menu' | 'bikeSelect' | 'race' | 'online' | 'lobby';
+export type RaceMode = 'solo' | 'online';
 
-export interface RaceResultRow {
-  id: string;
-  name: string;
-  color: string;
-  isHuman: boolean;
-  place: number;
-  time: number;
-  projected: boolean;
-  topSpeedKmh: number;
-  wrecks: number;
-  knockouts: number;
-}
+export type { RaceResultRow };
 
 export interface RaceResults {
   rows: RaceResultRow[];
-  player: {
-    place: number;
-    time: number;
-    score: number;
-    nearMisses: number;
-    wrecks: number;
-    collisions: number;
-    topSpeedKmh: number;
-    hitsLanded: number;
-    knockouts: number;
-    coins: number;
-    xp: number;
-  };
+  /** Id of the local rider in `rows`. */
+  playerId: string;
+  online: boolean;
 }
 
 interface GameState {
   screen: Screen;
+  raceMode: RaceMode;
   selectedBike: BikeId;
   selectedMap: MapId;
   raceId: number;
@@ -43,7 +24,10 @@ interface GameState {
   results: RaceResults | null;
   setScreen: (screen: Screen) => void;
   selectBike: (bike: BikeId) => void;
+  /** Starts a new solo race. */
   startRace: () => void;
+  /** Enters an online race (the server already decided everything about it). */
+  startOnlineRace: () => void;
   setPaused: (paused: boolean) => void;
   setSettingsOpen: (open: boolean) => void;
   setResults: (results: RaceResults | null) => void;
@@ -51,6 +35,7 @@ interface GameState {
 
 export const useGame = create<GameState>()((set) => ({
   screen: 'menu',
+  raceMode: 'solo',
   selectedBike: 'viper',
   selectedMap: 'coastal-highway',
   raceId: 0,
@@ -59,7 +44,8 @@ export const useGame = create<GameState>()((set) => ({
   results: null,
   setScreen: (screen) => set({ screen, paused: false }),
   selectBike: (selectedBike) => set({ selectedBike }),
-  startRace: () => set((s) => ({ screen: 'race', raceId: s.raceId + 1, paused: false, results: null })),
+  startRace: () => set((s) => ({ screen: 'race', raceMode: 'solo', raceId: s.raceId + 1, paused: false, results: null })),
+  startOnlineRace: () => set((s) => ({ screen: 'race', raceMode: 'online', raceId: s.raceId + 1, paused: false, results: null })),
   setPaused: (paused) => set({ paused }),
   setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
   setResults: (results) => set({ results }),

@@ -1,7 +1,7 @@
 {
   "name": "highway-rush",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "HIGHWAY RUSH - browser-based 3D motorcycle combat racing",
   "workspaces": [
     "packages/*",
@@ -9,12 +9,19 @@
   ],
   "scripts": {
     "dev": "npm run dev -w @highway-rush/client",
+    "dev:server": "npm run dev -w @highway-rush/server",
+    "dev:all": "concurrently -k -n server,client -c blue,magenta \"npm:dev:server\" \"npm:dev\"",
     "build": "npm run build -w @highway-rush/client",
+    "build:server": "npm run build -w @highway-rush/server",
+    "start:server": "npm run start -w @highway-rush/server",
     "preview": "npm run preview -w @highway-rush/client",
-    "typecheck": "npm run typecheck -w @highway-rush/shared && npm run typecheck -w @highway-rush/client",
-    "test": "npm run test -w @highway-rush/shared"
+    "typecheck": "npm run typecheck -w @highway-rush/shared && npm run typecheck -w @highway-rush/server && npm run typecheck -w @highway-rush/client",
+    "test": "npm run test -w @highway-rush/shared && npm run test -w @highway-rush/server"
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.7"
   }
 }

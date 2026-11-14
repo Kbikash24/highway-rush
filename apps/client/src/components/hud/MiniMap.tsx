@@ -99,7 +99,7 @@ export function MiniMap({ session }: { session: GameSession }) {
       }
 
       for (const r of session.sim.racers) {
-        if (r.isHuman) continue;
+        if (r.id === session.playerId) continue;
         const s = Math.max(p.s - BEHIND, Math.min(p.s + AHEAD, r.s));
         track.sample(s, sample);
         const [x, y] = project(sample.x + sample.rx * r.d, sample.z + sample.rz * r.d);

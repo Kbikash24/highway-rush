@@ -25,8 +25,8 @@ export function MainMenu() {
 
   const items: MenuItem[] = [
     { label: 'SOLO RACE', sub: 'Coastal Highway vs 3 AI rivals', action: () => setScreen('bikeSelect') },
-    { label: 'QUICK RACE', sub: 'Online · 4 players', phase: 'Phase 4' },
-    { label: 'PRIVATE ROOM', sub: 'Invite friends with a code', phase: 'Phase 4' },
+    { label: 'QUICK RACE', sub: 'Online · find a public race', action: () => setScreen('online') },
+    { label: 'PRIVATE ROOM', sub: 'Invite friends with a code', action: () => setScreen('online') },
     { label: 'CAMPAIGN', sub: 'Missions & boss races', phase: 'Phase 5' },
     { label: 'GARAGE', sub: 'Upgrades & paint', phase: 'Phase 5' },
     { label: 'SETTINGS', sub: 'Graphics · audio · controls', action: () => setSettingsOpen(true) },

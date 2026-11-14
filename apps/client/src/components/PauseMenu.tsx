@@ -1,7 +1,7 @@
 import { audio } from '../game/audio/AudioEngine';
 import { useGame } from '../store/gameStore';
 
-export function PauseMenu({ onResume, onRestart, onQuit }: { onResume: () => void; onRestart: () => void; onQuit: () => void }) {
+export function PauseMenu({ onResume, onRestart, onQuit, online }: { onResume: () => void; onRestart: () => void; onQuit: () => void; online?: boolean }) {
   const openSettings = useGame((s) => s.setSettingsOpen);
   const click = (fn: () => void) => () => {
     audio.ui('click');
@@ -10,18 +10,21 @@ export function PauseMenu({ onResume, onRestart, onQuit }: { onResume: () => voi
   return (
     <div className="modal-backdrop pause">
       <div className="panel pause-panel">
-        <h2>PAUSED</h2>
+        <h2>{online ? 'MENU' : 'PAUSED'}</h2>
+        {online && <p className="hint">Online races never pause — the race continues while this menu is open and your bike won't be steered.</p>}
         <button type="button" className="btn primary" onClick={click(onResume)}>
           RESUME
         </button>
-        <button type="button" className="btn" onClick={click(onRestart)}>
-          RESTART RACE
-        </button>
+        {!online && (
+          <button type="button" className="btn" onClick={click(onRestart)}>
+            RESTART RACE
+          </button>
+        )}
         <button type="button" className="btn" onClick={click(() => openSettings(true))}>
           SETTINGS
         </button>
         <button type="button" className="btn ghost" onClick={click(onQuit)}>
-          QUIT TO MENU
+          {online ? 'LEAVE RACE' : 'QUIT TO MENU'}
         </button>
         <ControlsCheatSheet />
       </div>

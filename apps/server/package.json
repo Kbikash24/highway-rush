@@ -1,0 +1,28 @@
+{
+  "name": "@highway-rush/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "bot": "tsx scripts/bot.ts",
+    "start": "node dist/index.js",
+    "build": "tsc -p tsconfig.json && node build.mjs",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@colyseus/core": "^0.16.26",
+    "@colyseus/schema": "^3.0.76",
+    "@colyseus/ws-transport": "^0.16.5",
+    "@highway-rush/shared": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "colyseus.js": "^0.16.22",
+    "esbuild": "^0.28.2",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  }
+}

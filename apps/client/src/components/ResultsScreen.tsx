@@ -3,7 +3,8 @@ import type { RaceResults } from '../store/gameStore';
 import { formatTime, ordinal } from '../utils/format';
 
 export function ResultsScreen({ results, onRetry, onMenu }: { results: RaceResults; onRetry: () => void; onMenu: () => void }) {
-  const { player, rows } = results;
+  const { rows, playerId, online } = results;
+  const player = rows.find((r) => r.id === playerId) ?? rows[0];
   const win = player.place === 1;
   return (
     <div className="modal-backdrop results">
@@ -25,10 +26,11 @@ export function ResultsScreen({ results, onRetry, onMenu }: { results: RaceResul
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.id} className={r.isHuman ? 'me' : ''}>
+              <tr key={r.id} className={r.id === playerId ? 'me' : ''}>
                 <td>{r.place}</td>
                 <td>
-                  <span className="opp-dot" style={{ background: r.color }} /> {r.isHuman ? `${r.name} (YOU)` : r.name}
+                  <span className="opp-dot" style={{ background: r.color }} /> {r.id === playerId ? `${r.name} (YOU)` : r.name}
+                  {r.left ? ' (left)' : ''}
                 </td>
                 <td>
                   {r.projected ? '~' : ''}
@@ -81,7 +83,7 @@ export function ResultsScreen({ results, onRetry, onMenu }: { results: RaceResul
               onRetry();
             }}
           >
-            RACE AGAIN
+            {online ? 'BACK TO LOBBY' : 'RACE AGAIN'}
           </button>
           <button
             type="button"

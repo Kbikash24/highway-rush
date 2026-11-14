@@ -36,9 +36,10 @@ function RacerBike({ session, racer }: { session: GameSession; racer: RacerState
   const anim = useRef({ crashT: 0, spin: 0, wheel: 0, lean: 0, wheelie: 0 });
   const scratch = useMemo(() => createTrackSample(), []);
   const bike = BIKES[racer.bikeId];
+  const isLocal = racer.id === session.playerId;
   const colors = useMemo(
-    () => ({ primary: racer.color, secondary: bike.colors.secondary, accent: bike.colors.accent, suit: racer.isHuman ? '#1f2937' : racer.color }),
-    [racer.color, racer.isHuman, bike],
+    () => ({ primary: racer.color, secondary: bike.colors.secondary, accent: bike.colors.accent, suit: isLocal ? '#1f2937' : racer.color }),
+    [racer.color, isLocal, bike],
   );
 
   useFrame((state, dt) => {
@@ -97,7 +98,7 @@ function RacerBike({ session, racer }: { session: GameSession; racer: RacerState
     // Blink while shielded after a respawn.
     g.visible = !(racer.combat.shield > 0 && !racer.crashed && Math.floor(state.clock.elapsedTime * 12) % 2 === 0);
 
-    if (!racer.isHuman) {
+    if (!isLocal) {
       const player = session.player;
       const gap = racer.s - player.s;
       // Fade with gap ahead, and fade out when the rider is right next to the camera (tag would fill the screen).
@@ -118,8 +119,8 @@ function RacerBike({ session, racer }: { session: GameSession; racer: RacerState
       <group ref={leanGroup}>
         <BikeModel colors={colors} rig={rig} />
       </group>
-      {!racer.isHuman && <sprite material={tag.material} position={[0, 2.35, 0]} scale={[1.8, 0.45, 1]} />}
-      {!racer.isHuman && (
+      {!isLocal && <sprite material={tag.material} position={[0, 2.35, 0]} scale={[1.8, 0.45, 1]} />}
+      {!isLocal && (
         <mesh ref={reachMarker} rotation-x={Math.PI} visible={false}>
           <coneGeometry args={[0.18, 0.32, 4]} />
           <meshBasicMaterial color="#ff3d5a" toneMapped={false} fog={false} />

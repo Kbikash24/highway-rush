@@ -7,6 +7,8 @@ import { formatTime, ordinal } from '../../utils/format';
 import { Speedometer } from './Speedometer';
 import { MiniMap } from './MiniMap';
 import { useTouchEnabled } from '../TouchControls';
+import { useGame } from '../../store/gameStore';
+import { useNet } from '../../multiplayer/netStore';
 
 function Countdown({ value, phase }: { value: number; phase: string }) {
   const [showGo, setShowGo] = useState(false);
@@ -82,6 +84,8 @@ export function RaceHUD({ session }: { session: GameSession }) {
   const notifications = useHud((s) => s.notifications);
   const showMinimap = useSettings((s) => s.showMinimap);
   const touch = useTouchEnabled();
+  const online = useGame((s) => s.raceMode === 'online');
+  const ping = useNet((s) => s.ping);
   if (!snap) return null;
 
   const healthFrac = snap.health / snap.maxHealth;
@@ -106,6 +110,11 @@ export function RaceHUD({ session }: { session: GameSession }) {
       </div>
 
       <div className="hud-progress">
+        {online && (
+          <div className={`net-chip ${ping > 150 ? 'bad' : ping > 80 ? 'warn' : ''}`}>
+            ONLINE · {ping ? `${Math.round(ping)} ms` : '…'}
+          </div>
+        )}
         <div className="progress-track">
           <div className="progress-finish" />
           {snap.racers.map((r) => (
