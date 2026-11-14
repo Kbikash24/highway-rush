@@ -1,0 +1,20 @@
+{
+  "name": "highway-rush",
+  "private": true,
+  "version": "0.1.0",
+  "description": "HIGHWAY RUSH - browser-based 3D motorcycle combat racing",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @highway-rush/client",
+    "build": "npm run build -w @highway-rush/client",
+    "preview": "npm run preview -w @highway-rush/client",
+    "typecheck": "npm run typecheck -w @highway-rush/shared && npm run typecheck -w @highway-rush/client",
+    "test": "npm run test -w @highway-rush/shared"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
