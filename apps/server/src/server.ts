@@ -18,9 +18,15 @@ export function createGameServer(config: ServerConfig): GameServer {
   const startedAt = Date.now();
 
   const httpServer = http.createServer((req, res) => {
-    if (req.url === '/health') {
+    const path = (req.url ?? '/').split('?')[0];
+    if (path === '/health') {
       res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
       res.end(JSON.stringify({ ok: true, uptime: Math.round((Date.now() - startedAt) / 1000) }));
+      return;
+    }
+    if (path === '/') {
+      res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
+      res.end('HIGHWAY RUSH game server is running. This is the API/WebSocket server, not the game website.\n');
       return;
     }
     res.writeHead(404).end();
