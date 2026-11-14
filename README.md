@@ -133,20 +133,56 @@ so a modified client cannot grant itself damage or health.
 
 ## Configuration
 
-Copy `apps/client/.env.example` to `apps/client/.env.local`. The current solo build needs **no** variables; the
-listed ones are reserved for multiplayer (Phase 4) and Supabase (Phase 5). Only `VITE_*` values reach the
-browser — never put the Supabase service-role key in client env files.
+- **Client** — copy `apps/client/.env.example` to `apps/client/.env.local`. `VITE_SERVER_URL` is the game server's
+  WebSocket URL (`wss://…` in production; in dev it defaults to `ws://<page host>:2567`). Only `VITE_*` values reach
+  the browser — never put the Supabase service-role key in client env files.
+- **Server** — copy `apps/server/.env.example` to `apps/server/.env`. Key settings: `PORT`, and `CLIENT_ORIGINS`
+  (comma-separated list of allowed website origins; **an empty list accepts any origin — development only**).
 
-## Deploying the client (free tier)
+## Running locally
+
+```bash
+npm install
+npm run dev:all        # game server on :2567 + client on :5173 (Vite picks another port if busy)
+npm run bot -w @highway-rush/server -- --code ABCDE     # optional: a headless test player for a room code
+```
+
+## Deploying (free tier)
+
+The frontend and the game server deploy **separately**.
+
+### 1. Game server → Render
+
+The server is a long-running Node process holding WebSocket connections, so it needs a host that runs a
+persistent process (Render, Fly.io, Railway…) — not a static or serverless host. A ready-made blueprint is in
+[`render.yaml`](./render.yaml).
+
+1. Push the repo to GitHub. In Render: **New → Blueprint** → select the repo (or **New → Web Service** and enter
+   the commands below by hand).
+2. Settings (already in the blueprint): build `npm install --include=dev && npm run build:server`,
+   start `npm run start:server`, health check path `/health`, Node 22.
+3. Set the environment variable **`CLIENT_ORIGINS`** to your deployed frontend URL, e.g.
+   `https://highway-rush.vercel.app` (no trailing slash; comma-separate several). Render provides `PORT` itself.
+4. After deploy, check `https://<your-service>.onrender.com/health` returns `{"ok":true,…}`.
+
+Free-tier note: Render's free web services sleep when idle, so the first player after a quiet period may wait
+30–60 s while the server wakes up. Rooms live in memory on a single instance; a redeploy or restart ends races in
+progress.
+
+### 2. Frontend → Vercel / Netlify / Cloudflare Pages
 
 The client is a static site (`apps/client/dist`).
 
-- **Vercel / Netlify / Cloudflare Pages**: build command `npm run build`, output directory `apps/client/dist`,
-  install command `npm install` (run at the repo root so the workspace package resolves). Node 20+.
-- **GitHub Pages**: run `npm run build` and publish `apps/client/dist` (set Vite `base` if serving from a sub-path).
+- Build command `npm run build`, output directory `apps/client/dist`, install command `npm install` (run at the
+  repo root so the workspace package resolves). Node 20+.
+- Set **`VITE_SERVER_URL=wss://<your-service>.onrender.com`** as a build-time environment variable (it is baked
+  into the build, so changing it needs a redeploy). It must be `wss://` — an https page cannot open `ws://`.
+- GitHub Pages also works: run `npm run build` and publish `apps/client/dist` (set Vite `base` if using a sub-path).
 
-The Colyseus server (Phase 4) will be a separate Node service deployable to a free tier such as Render or
-Fly.io, keeping frontend and backend independently deployable.
+### Wiring check
+
+If the online screens say *"Cannot reach the game server"* the URL is wrong or the server is asleep; if they say
+*"rejected this website (CORS / allowed origins)"*, `CLIENT_ORIGINS` doesn't exactly match the frontend's URL.
 
 ## Roadmap & status
 
@@ -155,7 +191,7 @@ Fly.io, keeping frontend and backend independently deployable.
 | 1 | Architecture, menu, 3D highway, motorcycle, chase camera, steering/accel/brake | ✅ Done |
 | 2 | Collisions, traffic AI, health, nitro (custom arcade physics — see above) | ✅ Done |
 | 3 | Combat: punch/kick/weapons, block, knockback, stagger, pickups, AI combat | ✅ Done — validated by the shared simulation; it becomes server-side once Phase 4 adds the server |
-| 4 | Colyseus server, 4-player rooms, matchmaking, private rooms, sync, results | ⏳ Not started — menu entries are visibly locked; there is **no** fake multiplayer |
+| 4 | Colyseus server, 4-player rooms, matchmaking, private rooms, sync, results | ✅ Built — real server-authoritative multiplayer (prediction, interpolation, reconnection). Automated tests pass; hasn't been play-tested with several real people yet |
 | 5 | Garage, upgrades, progression (Supabase), other 3 maps, campaign, police | ⏳ Not started — results show coins/XP but nothing is persisted yet |
 | 6 | Polish: recorded audio/music via Howler, more VFX, mobile tuning, deployment | 🟡 Partial — procedural audio, touch controls, quality presets done |
 

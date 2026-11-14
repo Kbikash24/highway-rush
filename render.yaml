@@ -1,0 +1,20 @@
+# Render Blueprint for the HIGHWAY RUSH game server (Colyseus / WebSocket).
+# The frontend is a static site and is deployed separately (Vercel / Netlify / Cloudflare Pages).
+services:
+  - type: web
+    name: highway-rush-server
+    runtime: node
+    plan: free
+    # Monorepo: install at the repo root so the shared workspace package resolves.
+    # --include=dev is required because the build needs TypeScript/esbuild (Render sets NODE_ENV=production).
+    buildCommand: npm install --include=dev && npm run build:server
+    startCommand: npm run start:server
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # Your deployed frontend URL(s), comma-separated, no trailing slash. Set this in the Render dashboard.
+      - key: CLIENT_ORIGINS
+        sync: false
+      # PORT is provided by Render automatically.
